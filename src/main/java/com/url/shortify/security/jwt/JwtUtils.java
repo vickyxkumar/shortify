@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 import javax.crypto.SecretKey;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import com.url.shortify.services.UserDetailsImpl;
 
@@ -16,6 +17,7 @@ import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletRequest;
 
+@Component
 public class JwtUtils {
 
     @Value("${jwt.secret}")
