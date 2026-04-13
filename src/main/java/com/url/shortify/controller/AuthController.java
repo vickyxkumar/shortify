@@ -30,7 +30,7 @@ public class AuthController {
         user.setEmail(registerBody.getEmail());
         user.setUsername(registerBody.getUsername());
         user.setPassword(registerBody.getPassword());
-        user.setRole("USER");
+        user.setRole("ROLE_USER");
         userService.registerUser(user);
         return ResponseEntity.ok("User register successfully");
     }
