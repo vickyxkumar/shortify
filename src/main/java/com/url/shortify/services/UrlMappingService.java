@@ -7,7 +7,6 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 
 import com.url.shortify.dtos.ClickEventDTO;
