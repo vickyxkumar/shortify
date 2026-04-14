@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.springframework.security.core.parameters.P;
 import org.springframework.stereotype.Service;
 
 import com.url.shortify.dtos.ClickEventDTO;
@@ -94,5 +95,20 @@ public class UrlMappingService {
         List<ClickEvent> clickEvents = clickEventRepository.findByUrlMappingInAndClickDateBetween(urlMappings, start.atStartOfDay(), end.plusDays(1).atStartOfDay());
 
         return clickEvents.stream().collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()));
+    }
+
+    public UrlMapping getOriginalUrl(String shortUrl) {
+        UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
+        if(urlMapping != null){
+            urlMapping.setCount(urlMapping.getCount()+1);
+            urlMappingRepository.save(urlMapping);
+
+            ClickEvent clickEvent = new ClickEvent();
+            clickEvent.setUrlMapping(urlMapping);
+            clickEvent.setClickDate(LocalDateTime.now());
+            clickEventRepository.save(clickEvent);
+        }
+        
+        return urlMapping;
     }
 }
