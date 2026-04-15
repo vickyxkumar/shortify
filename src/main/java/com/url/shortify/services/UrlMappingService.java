@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import com.url.shortify.dtos.ClickEventDTO;
@@ -16,6 +17,8 @@ import com.url.shortify.models.UrlMapping;
 import com.url.shortify.models.User;
 import com.url.shortify.repository.ClickEventRepository;
 import com.url.shortify.repository.UrlMappingRepository;
+import com.url.shortify.utils.EncodeBase62;
+import com.url.shortify.utils.SnowflakeGenerator;
 
 import lombok.AllArgsConstructor;
 
@@ -26,18 +29,25 @@ public class UrlMappingService {
     private UrlMappingRepository urlMappingRepository;
     private ClickEventRepository clickEventRepository;
     private RedisCacheService redisCacheService;
+    private SnowflakeGenerator snowflakeGenerator;
+    private EncodeBase62 encodingUtil;
+
 
     public UrlMappingDTO createShortUrl(String originalUrl, User user) {
-        String shortUrl = generateShortUrl();
+
+        long id = snowflakeGenerator.nextId();
+
+        String shortCode = encodingUtil.encodeBase62(id);
         UrlMapping urlMapping = new UrlMapping();
+        urlMapping.setId(id);
         urlMapping.setOriginalUrl(originalUrl);
         urlMapping.setUser(user);
         urlMapping.setCreatedAt(LocalDateTime.now());
-        urlMapping.setShortUrl(shortUrl);
+        urlMapping.setShortUrl(shortCode);
 
         UrlMapping savedUrlMapping = urlMappingRepository.save(urlMapping);
-        redisCacheService.saveUrl(shortUrl, originalUrl);
-
+        
+        redisCacheService.saveUrl(shortCode, originalUrl);
         return convertToDto(savedUrlMapping);
     }
 
@@ -50,19 +60,6 @@ public class UrlMappingService {
         urlMappingDTO.setUserName(urlMapping.getUser().getUsername());
 
         return urlMappingDTO;
-    }
-
-    private String generateShortUrl() {
-
-        String characters = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-
-        Random random = new Random();
-        StringBuilder shortUrl = new StringBuilder(8);
-
-        for (int i = 0; i < 8; i++) {
-            shortUrl.append(characters.charAt(random.nextInt(characters.length())));
-        }
-        return shortUrl.toString();
     }
 
     public List<UrlMappingDTO> getUrlsByUser(User user) {
