@@ -1,11 +1,11 @@
 package com.url.shortify.dtos;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 
 import lombok.Data;
 
 @Data
 public class ClickEventDTO {
-    private Long count;
-    private LocalDate clickDate;
+    private String shortUrl;
+    private LocalDateTime timestamp;
 }
