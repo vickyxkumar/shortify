@@ -25,6 +25,7 @@ public class UrlMappingService {
 
     private UrlMappingRepository urlMappingRepository;
     private ClickEventRepository clickEventRepository;
+    private RedisCacheService redisCacheService;
 
     public UrlMappingDTO createShortUrl(String originalUrl, User user) {
         String shortUrl = generateShortUrl();
@@ -35,13 +36,13 @@ public class UrlMappingService {
         urlMapping.setShortUrl(shortUrl);
 
         UrlMapping savedUrlMapping = urlMappingRepository.save(urlMapping);
+        redisCacheService.saveUrl(shortUrl, originalUrl);
 
         return convertToDto(savedUrlMapping);
     }
 
     private UrlMappingDTO convertToDto(UrlMapping urlMapping) {
         UrlMappingDTO urlMappingDTO = new UrlMappingDTO();
-        urlMappingDTO.setClickCount(urlMapping.getCount());
         urlMappingDTO.setCreatedAt(urlMapping.getCreatedAt());
         urlMappingDTO.setId(urlMapping.getId());
         urlMappingDTO.setOriginalUrl(urlMapping.getOriginalUrl());
@@ -68,46 +69,54 @@ public class UrlMappingService {
         return urlMappingRepository.findByUser(user).stream().map(this::convertToDto).toList();
     }
 
-    public List<ClickEventDTO> getUrlAnalytics(String shortUrl, LocalDateTime startDate, LocalDateTime endDate) {
-        UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
-        if (urlMapping != null) {
-            return clickEventRepository.findByUrlMappingAndClickDateBetween(urlMapping, startDate, endDate).stream()
-                    .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()))
-                    .entrySet().stream().map(entry -> {
-                        ClickEventDTO clickEventDTO = new ClickEventDTO();
-                        clickEventDTO.setClickDate(entry.getKey());
-                        clickEventDTO.setCount(entry.getValue());
-                        return clickEventDTO;
-                    }).collect(Collectors.toList());
+    // public List<ClickEventDTO> getUrlAnalytics(String shortUrl, LocalDateTime startDate, LocalDateTime endDate) {
+    //     UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
+    //     if (urlMapping != null) {
+    //         return clickEventRepository.findByUrlMappingAndClickDateBetween(urlMapping, startDate, endDate).stream()
+    //                 .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()))
+    //                 .entrySet().stream().map(entry -> {
+    //                     ClickEventDTO clickEventDTO = new ClickEventDTO();
+    //                     clickEventDTO.setClickDate(entry.getKey());
+    //                     clickEventDTO.setCount(entry.getValue());
+    //                     return clickEventDTO;
+    //                 }).collect(Collectors.toList());
+    //     }
+
+    //     return null;
+
+    // }
+
+    // public Map<LocalDate, Long> getTotalClicksByUserAndDate(User user, LocalDate start, LocalDate end) {
+
+    //     // get all the url mapping from that user
+    //     List<UrlMapping> urlMappings = urlMappingRepository.findByUser(user);
+
+    //     // get all the clicks on that date for all the urls
+    //     List<ClickEvent> clickEvents = clickEventRepository.findByUrlMappingInAndClickDateBetween(urlMappings,
+    //             start.atStartOfDay(), end.plusDays(1).atStartOfDay());
+
+    //     return clickEvents.stream()
+    //             .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()));
+    // }
+
+    public String getOriginalUrl(String shortUrl) { 
+
+        String cachedOriginalUrl = redisCacheService.getOriginalUrl(shortUrl);
+        if (cachedOriginalUrl == null) {
+            // Fallback to datebase
+            UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
+            if (urlMapping == null) {
+                throw new RuntimeException("URL not found");
+            }
+            cachedOriginalUrl = urlMapping.getOriginalUrl();
+
+            redisCacheService.saveUrl(shortUrl, cachedOriginalUrl);
+
         }
 
-        return null;
+        redisCacheService.increamentCount(shortUrl);
+        redisCacheService.pushClickEvent(shortUrl);
 
-    }
-
-    public Map<LocalDate, Long> getTotalClicksByUserAndDate(User user, LocalDate start, LocalDate end) {
-        
-        // get all the url mapping from that user
-        List<UrlMapping> urlMappings = urlMappingRepository.findByUser(user);
-
-        // get all the clicks on that date for all the urls
-        List<ClickEvent> clickEvents = clickEventRepository.findByUrlMappingInAndClickDateBetween(urlMappings, start.atStartOfDay(), end.plusDays(1).atStartOfDay());
-
-        return clickEvents.stream().collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()));
-    }
-
-    public UrlMapping getOriginalUrl(String shortUrl) {
-        UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
-        if(urlMapping != null){
-            urlMapping.setCount(urlMapping.getCount()+1);
-            urlMappingRepository.save(urlMapping);
-
-            ClickEvent clickEvent = new ClickEvent();
-            clickEvent.setUrlMapping(urlMapping);
-            clickEvent.setClickDate(LocalDateTime.now());
-            clickEventRepository.save(clickEvent);
-        }
-        
-        return urlMapping;
+        return cachedOriginalUrl;
     }
 }
