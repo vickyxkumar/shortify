@@ -31,7 +31,7 @@ public class UrlMappingService {
     private RedisCacheService redisCacheService;
     private SnowflakeGenerator snowflakeGenerator;
     private EncodeBase62 encodingUtil;
-
+    private KafkaProducerService kafkaProducerService;
 
     public UrlMappingDTO createShortUrl(String originalUrl, User user) {
 
@@ -46,7 +46,7 @@ public class UrlMappingService {
         urlMapping.setShortUrl(shortCode);
 
         UrlMapping savedUrlMapping = urlMappingRepository.save(urlMapping);
-        
+
         redisCacheService.saveUrl(shortCode, originalUrl);
         return convertToDto(savedUrlMapping);
     }
@@ -66,37 +66,43 @@ public class UrlMappingService {
         return urlMappingRepository.findByUser(user).stream().map(this::convertToDto).toList();
     }
 
-    // public List<ClickEventDTO> getUrlAnalytics(String shortUrl, LocalDateTime startDate, LocalDateTime endDate) {
-    //     UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
-    //     if (urlMapping != null) {
-    //         return clickEventRepository.findByUrlMappingAndClickDateBetween(urlMapping, startDate, endDate).stream()
-    //                 .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()))
-    //                 .entrySet().stream().map(entry -> {
-    //                     ClickEventDTO clickEventDTO = new ClickEventDTO();
-    //                     clickEventDTO.setClickDate(entry.getKey());
-    //                     clickEventDTO.setCount(entry.getValue());
-    //                     return clickEventDTO;
-    //                 }).collect(Collectors.toList());
-    //     }
+    // public List<ClickEventDTO> getUrlAnalytics(String shortUrl, LocalDateTime
+    // startDate, LocalDateTime endDate) {
+    // UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
+    // if (urlMapping != null) {
+    // return clickEventRepository.findByUrlMappingAndClickDateBetween(urlMapping,
+    // startDate, endDate).stream()
+    // .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(),
+    // Collectors.counting()))
+    // .entrySet().stream().map(entry -> {
+    // ClickEventDTO clickEventDTO = new ClickEventDTO();
+    // clickEventDTO.setClickDate(entry.getKey());
+    // clickEventDTO.setCount(entry.getValue());
+    // return clickEventDTO;
+    // }).collect(Collectors.toList());
+    // }
 
-    //     return null;
+    // return null;
 
     // }
 
-    // public Map<LocalDate, Long> getTotalClicksByUserAndDate(User user, LocalDate start, LocalDate end) {
+    // public Map<LocalDate, Long> getTotalClicksByUserAndDate(User user, LocalDate
+    // start, LocalDate end) {
 
-    //     // get all the url mapping from that user
-    //     List<UrlMapping> urlMappings = urlMappingRepository.findByUser(user);
+    // // get all the url mapping from that user
+    // List<UrlMapping> urlMappings = urlMappingRepository.findByUser(user);
 
-    //     // get all the clicks on that date for all the urls
-    //     List<ClickEvent> clickEvents = clickEventRepository.findByUrlMappingInAndClickDateBetween(urlMappings,
-    //             start.atStartOfDay(), end.plusDays(1).atStartOfDay());
+    // // get all the clicks on that date for all the urls
+    // List<ClickEvent> clickEvents =
+    // clickEventRepository.findByUrlMappingInAndClickDateBetween(urlMappings,
+    // start.atStartOfDay(), end.plusDays(1).atStartOfDay());
 
-    //     return clickEvents.stream()
-    //             .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(), Collectors.counting()));
+    // return clickEvents.stream()
+    // .collect(Collectors.groupingBy(click -> click.getClickDate().toLocalDate(),
+    // Collectors.counting()));
     // }
 
-    public String getOriginalUrl(String shortUrl) { 
+    public String getOriginalUrl(String shortUrl) {
 
         String cachedOriginalUrl = redisCacheService.getOriginalUrl(shortUrl);
         if (cachedOriginalUrl == null) {
@@ -111,8 +117,11 @@ public class UrlMappingService {
 
         }
 
-        redisCacheService.increamentCount(shortUrl);
-        redisCacheService.pushClickEvent(shortUrl);
+        ClickEventDTO event = new ClickEventDTO();
+        event.setShortUrl(shortUrl);
+        event.setTimestamp(LocalDateTime.now());
+
+        kafkaProducerService.sendClickEvent(event);
 
         return cachedOriginalUrl;
     }
