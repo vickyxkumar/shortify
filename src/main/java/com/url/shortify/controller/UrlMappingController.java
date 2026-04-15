@@ -7,6 +7,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.catalina.filters.RateLimitFilter;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.url.shortify.dtos.ClickEventDTO;
 import com.url.shortify.dtos.UrlMappingDTO;
 import com.url.shortify.models.User;
+import com.url.shortify.services.RateLimiterService;
 import com.url.shortify.services.UrlMappingService;
 import com.url.shortify.services.UserService;
 
@@ -32,10 +34,15 @@ public class UrlMappingController {
 
     private UrlMappingService urlMappingService;
     private UserService userService;
+    private RateLimiterService rateLimiterService;
 
     @PostMapping("/shorten")
     @PreAuthorize("hasRole('ROLE_USER')")
-    public ResponseEntity<UrlMappingDTO> createShortUrl(@RequestBody Map<String,String> request, Principal principal){
+    public ResponseEntity<?> createShortUrl(@RequestBody Map<String,String> request, Principal principal){
+        String key = "user:" + principal.getName();
+        if (!rateLimiterService.isAllowed(key)) {
+            return ResponseEntity.status(429).body("Too many requests");
+        }
         String originalUrl = request.get("originalUrl");
         User user = userService.findByUsername(principal.getName());
         UrlMappingDTO urlMappingDTO  = urlMappingService.createShortUrl(originalUrl, user);
