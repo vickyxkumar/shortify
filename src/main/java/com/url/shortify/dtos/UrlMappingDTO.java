@@ -9,7 +9,6 @@ public class UrlMappingDTO {
     private Long id;
     private String originalUrl;
     private String shortUrl;
-    private int clickCount;
     private LocalDateTime createdAt;
     private String userName;
 }
