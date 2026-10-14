@@ -88,7 +88,7 @@ Shortify is a high-performance URL shortening service designed to handle **read-
 
 ### 1. Start Redis
 
-    redis-server
+    docker run -d --name shortify-redis-server --p 6380:6379
 
 ### 2. Start Kafka & ZooKeeper (Docker)
 
