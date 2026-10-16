@@ -1,0 +1,44 @@
+# The Dockerfile only needs pom.xml and src/. Everything below is kept out of the build context.
+
+# secrets: never bake into an image
+.env
+.env.*
+
+# version control
+.git
+.gitignore
+.gitattributes
+
+# build output (the image builds its own jar)
+target/
+
+# maven wrapper (Dockerfile uses the maven image's mvn)
+.mvn/
+mvnw
+mvnw.cmd
+
+# IDE / editor
+.vscode/
+.idea/
+*.iml
+.settings/
+.project
+.classpath
+.factorypath
+
+# docs
+Readme.md
+HELP.md
+docs/
+
+# load testing & monitoring (mounted from the host, not built into the app)
+loadtest/
+
+# docker files themselves
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# OS / logs
+.DS_Store
+*.log
