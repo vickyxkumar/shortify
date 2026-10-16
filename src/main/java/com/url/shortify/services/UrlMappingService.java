@@ -109,7 +109,8 @@ public class UrlMappingService {
             // Fallback to datebase
             UrlMapping urlMapping = urlMappingRepository.findByShortUrl(shortUrl);
             if (urlMapping == null) {
-                throw new RuntimeException("URL not found");
+                // controller turns null into a 404
+                return null;
             }
             cachedOriginalUrl = urlMapping.getOriginalUrl();
 
