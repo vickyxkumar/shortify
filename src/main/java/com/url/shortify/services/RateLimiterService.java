@@ -4,6 +4,7 @@ import java.time.Duration;
 import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ZSetOperations;
 import org.springframework.stereotype.Service;
@@ -15,7 +16,13 @@ public class RateLimiterService {
     @Autowired
     private RedisTemplate<String, String> redisTemplate;
 
-    private static final int LIMIT = 10;
+    // turn off (or raise the limit) for load tests, otherwise a single client IP gets 429s
+    @Value("${ratelimit.enabled:true}")
+    private boolean enabled;
+
+    @Value("${ratelimit.limit:10}")
+    private int limit;
+
     private static final long WINDOW_SIZE = 60_000;
 
     // key: rate_limit:{identifier}
@@ -25,6 +32,10 @@ public class RateLimiterService {
     // the above is the data structure for the redis based rate limiter
 
     public boolean isAllowed(String key) {
+
+        if (!enabled) {
+            return true;
+        }
 
         long now = System.currentTimeMillis();
         long windowStart = now - WINDOW_SIZE;
@@ -39,7 +50,7 @@ public class RateLimiterService {
         // 2. Get current count
         Long count = zSet.zCard(redisKey);
 
-        if (count != null && count >= LIMIT) {
+        if (count != null && count >= limit) {
             return false;
         }
 
