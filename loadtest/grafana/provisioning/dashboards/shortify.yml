@@ -1,0 +1,7 @@
+apiVersion: 1
+providers:
+  - name: shortify
+    folder: Shortify
+    type: file
+    options:
+      path: /var/lib/grafana/dashboards

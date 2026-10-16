@@ -34,3 +34,7 @@ build/
 
 #environment variables
 .env
+
+#load test output
+loadtest/data/
+loadtest/results/*.json

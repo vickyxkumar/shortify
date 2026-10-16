@@ -1,0 +1,94 @@
+services:
+
+  # Postgres (local DB, used for load testing instead of the remote Neon DB)
+  postgres:
+    image: postgres:16
+    container_name: shortify-postgres
+    environment:
+      POSTGRES_DB: shortify
+      POSTGRES_USER: shortify
+      POSTGRES_PASSWORD: shortify
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U shortify -d shortify"]
+      interval: 5s
+      retries: 10
+    cpus: 1.5
+    mem_limit: 768m
+
+  # Redis
+  redis:
+    image: redis:7
+    container_name: shortify-redis
+    ports:
+      - "6380:6379"
+    cpus: 0.5
+    mem_limit: 256m
+
+  # ZooKeeper
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.3.0
+    container_name: shortify-zookeeper-server
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      KAFKA_HEAP_OPTS: "-Xms128m -Xmx128m"
+    ports:
+      - "2181:2181"
+    mem_limit: 256m
+
+  # Kafka
+  # internal listener kafka:29092 (containers), host listener localhost:9092 (app run via mvn)
+  kafka:
+    image: confluentinc/cp-kafka:7.3.0
+    container_name: shortify-kafka-server
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx256m"
+    cpus: 1
+    mem_limit: 640m
+
+  # Spring Boot App
+  shortify-app:
+    build: .
+    container_name: shortify-app
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      kafka:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    # JWT, kafka serializers etc. come from .env; the values below override it for the docker network
+    env_file: .env
+    environment:
+      DATABASE_URL: jdbc:postgresql://postgres:5432/shortify
+      DATABASE_USERNAME: shortify
+      DATABASE_PASSWORD: shortify
+      REDIS_HOSTNAME: redis
+      REDIS_PORT: 6379
+      SERVER_URL: kafka:29092
+      RATELIMIT_ENABLED: ${RATELIMIT_ENABLED:-true}
+      RATELIMIT_LIMIT: ${RATELIMIT_LIMIT:-10}
+      JAVA_TOOL_OPTIONS: -XX:MaxRAMPercentage=75
+    # fixed resources so results read as "capacity of one instance"
+    cpus: 2
+    mem_limit: 1g
+    restart: on-failure
+
+volumes:
+  pgdata:
